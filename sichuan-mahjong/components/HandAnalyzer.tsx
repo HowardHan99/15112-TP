@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Tile } from "./Tile";
 import { ALL_TILES, evaluateHand, sortTiles, tileIndex, tileName, type Meld, type MeldType } from "@/lib/mahjong";
 import type { FanSpec } from "@/lib/fans";
@@ -43,6 +43,10 @@ export function HandAnalyzer({
   const [preview, setPreview] = useState<string | null>(null);
   const camRef = useRef<HTMLInputElement>(null);
   const albumRef = useRef<HTMLInputElement>(null);
+  const [photoEnabled, setPhotoEnabled] = useState(false);
+  useEffect(() => {
+    fetch("/api/analyze").then((r) => r.json()).then((j) => setPhotoEnabled(!!j.enabled)).catch(() => {});
+  }, []);
 
   const used = useMemo(() => {
     const c = new Array(27).fill(0);
@@ -102,23 +106,6 @@ export function HandAnalyzer({
 
   return (
     <div>
-      <div className="row">
-        <button className="btn primary grow" disabled={busy} onClick={() => camRef.current?.click()}>
-          {busy ? <><span className="spin" /> 识别中…</> : "拍照识牌"}
-        </button>
-        <button className="btn" disabled={busy} onClick={() => albumRef.current?.click()}>
-          从相册选
-        </button>
-        <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFile(e.target.files?.[0])} />
-        <input ref={albumRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files?.[0])} />
-      </div>
-      <p className="muted" style={{ margin: "6px 0 0" }}>
-        把一家的牌摊开、正面朝上拍清楚（碰杠的牌放在一边）。识别完请核对，点牌可删除，下面可以补牌。
-      </p>
-      {preview && (
-        <img src={preview} alt="照片" style={{ width: "100%", maxHeight: 160, objectFit: "contain", marginTop: 8, borderRadius: 10 }} />
-      )}
-      {notes && <div className="muted" style={{ marginTop: 6 }}>识别备注：{notes}</div>}
       {err && <div className="err">{err}</div>}
 
       <div className="card" style={{ minHeight: 72 }}>
@@ -144,7 +131,7 @@ export function HandAnalyzer({
               <Tile key={`${t}${i}`} t={t} onClick={() => setConcealed((c) => { const j = c.indexOf(t); return c.filter((_, k) => k !== j); })} />
             ))}
           </span>
-          {count === 0 && <span className="muted">拍照，或点下面的牌把手牌输进来</span>}
+          {count === 0 && <span className="muted">点下面的牌输入手牌</span>}
         </div>
       </div>
 
@@ -197,6 +184,21 @@ export function HandAnalyzer({
               </tbody>
             </table>
           )}
+        </div>
+      )}
+      {photoEnabled && (
+        <div style={{ marginTop: 16 }}>
+          <div className="row">
+            <span className="muted grow">也可以拍照识别（可选，识别后请核对）</span>
+            <button className="btn small" disabled={busy} onClick={() => camRef.current?.click()}>
+              {busy ? <><span className="spin" /> 识别中</> : "拍照"}
+            </button>
+            <button className="btn small" disabled={busy} onClick={() => albumRef.current?.click()}>相册</button>
+            <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFile(e.target.files?.[0])} />
+            <input ref={albumRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files?.[0])} />
+          </div>
+          {preview && <img src={preview} alt="照片" style={{ width: "100%", maxHeight: 140, objectFit: "contain", marginTop: 8 }} />}
+          {notes && <div className="muted" style={{ marginTop: 6 }}>识别备注：{notes}</div>}
         </div>
       )}
     </div>

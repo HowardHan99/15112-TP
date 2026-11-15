@@ -41,6 +41,10 @@ const PROMPT = `这是一张四川麻将（血战到底）的照片。四川麻�
 - 不要把桌面上打出去的牌（牌河）算进来。如果照片里有多个人的牌，只识别离镜头最近、最完整的那一手。
 - 数清楚张数：碰杠按 3 张算，胡牌时一般共 14 张，听牌时 13 张。看不清的牌在 notes 里说明，尽量给出最可能的牌。`;
 
+export async function GET() {
+  return json({ enabled: !!process.env.ANTHROPIC_API_KEY });
+}
+
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) return bad("服务器没有配置 ANTHROPIC_API_KEY，暂时不能拍照识牌", 503);
   const body = await req.json().catch(() => ({}));

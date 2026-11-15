@@ -138,8 +138,15 @@ async function getMeta(code: string): Promise<Meta | null> {
   return raw ? (JSON.parse(raw) as Meta) : null;
 }
 
+export const DEFAULT_ROOM = "MAIN";
+
 export async function getRoom(code: string): Promise<Room | null> {
-  const meta = await getMeta(code);
+  let meta = await getMeta(code);
+  if (!meta && code === DEFAULT_ROOM) {
+    // 默认房间：第一次访问时自动创建
+    meta = { code, name: "川麻记分", createdAt: Date.now(), settings: DEFAULT_SETTINGS };
+    await db().set(K.meta(code), JSON.stringify(meta));
+  }
   if (!meta) return null;
   const [players, hands, deleted] = await Promise.all([
     db().hgetall(K.players(code)),
@@ -179,6 +186,13 @@ export async function addHand(code: string, hand: Omit<Hand, "id" | "createdAt">
 
 export async function deleteHand(code: string, id: string): Promise<void> {
   await db().sadd(K.deleted(code), id);
+  await db().touch(allKeys(code));
+}
+
+/** 新一局：清空所有记录（玩家保留） */
+export async function clearHands(code: string): Promise<void> {
+  const room = await getRoom(code);
+  for (const h of room?.hands ?? []) await db().sadd(K.deleted(code), h.id);
   await db().touch(allKeys(code));
 }
 

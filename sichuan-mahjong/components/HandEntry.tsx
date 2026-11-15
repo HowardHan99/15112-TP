@@ -51,7 +51,7 @@ function FanEditor({ spec, onChange, room }: { spec: FanSpec; onChange: (s: FanS
   return (
     <div>
       <button className="btn block" style={{ marginBottom: 8 }} onClick={() => setScan(true)}>
-        拍照或选牌，自动算番
+        选牌自动算番
       </button>
       <h3>牌型</h3>
       <div className="chips">
@@ -118,7 +118,9 @@ export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; 
   }
   function add(kind: HandEvent["kind"]) {
     const done = huedBefore(events.length);
-    const winner = players.find((p) => !done.includes(p.id))?.id ?? players[0].id;
+    const winner = !done.includes(me.id) && players.some((p) => p.id === me.id)
+      ? me.id
+      : players.find((p) => !done.includes(p.id))?.id ?? players[0].id;
     const others = (w: string) => players.map((p) => p.id).filter((id) => id !== w && !done.includes(id));
     if (kind === "hu") setEvents((es) => [...es, { kind: "hu", winner, from: null, payers: others(winner), spec: emptySpec() }]);
     if (kind === "gang") setEvents((es) => [...es, { kind: "gang", gangType: "an", who: winner, from: null, payers: others(winner) }]);

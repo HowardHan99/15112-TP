@@ -1,4 +1,4 @@
-import { addHand, getRoom, normCode } from "@/lib/store";
+import { addHand, clearHands, getRoom, normCode } from "@/lib/store";
 import { bad, json } from "@/lib/http";
 import { validateEvent, type HandEvent } from "@/lib/scoring";
 import { EXTRAS, PATTERNS, type ExtraKey, type PatternKey } from "@/lib/fans";
@@ -63,5 +63,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     settings: room.settings,
     note: String(body.note ?? "").slice(0, 60) || undefined,
   });
+  return json(await getRoom(code));
+}
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ code: string }> }) {
+  const code = normCode((await params).code);
+  const room = await getRoom(code);
+  if (!room) return bad("房间不存在", 404);
+  const playerId = new URL(req.url).searchParams.get("playerId");
+  if (!room.players.some((p) => p.id === playerId)) return bad("请先加入", 403);
+  await clearHands(code);
   return json(await getRoom(code));
 }

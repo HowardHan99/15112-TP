@@ -9,9 +9,9 @@ import { HandEntry, describeEvent } from "./HandEntry";
 const fmt = (n: number) => (Math.round(n * 100) / 100).toString();
 const signed = (n: number) => (n > 0 ? `+${fmt(n)}` : fmt(n));
 
-function SettingsSheet({ room, onClose, onSaved }: { room: Room; onClose: () => void; onSaved: (r: Room) => void }) {
+function SettingsSheet({ room, me, onClose, onSaved }: { room: Room; me: Me | null; onClose: () => void; onSaved: (r: Room) => void }) {
   const [s, setS] = useState<Settings>(room.settings);
-  const [name, setName] = useState(room.name);
+  const name = room.name;
   const [err, setErr] = useState("");
   async function save() {
     try {
@@ -20,21 +20,30 @@ function SettingsSheet({ room, onClose, onSaved }: { room: Room; onClose: () => 
       setErr((e as Error).message);
     }
   }
+  async function clearAll() {
+    if (!me || !confirm("开新一局会清空所有记录（玩家保留），确定？")) return;
+    try {
+      onSaved(await api<Room>(`/api/rooms/${room.code}/hands?playerId=${me.id}`, { method: "DELETE" }));
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }
   return (
     <div className="sheet-bg" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
-          <h2>房间规则</h2>
+          <h2>规则</h2>
           <button className="btn small" onClick={onClose}>关闭</button>
         </div>
         <SettingsForm s={s} setS={setS} />
-        <label className="field">
-          <span>房间名</span>
-          <input type="text" value={name} maxLength={16} onChange={(e) => setName(e.target.value)} />
-        </label>
         <p className="muted">改规则只影响之后记的把数，已经记过的按当时规则算。</p>
         {err && <div className="err">{err}</div>}
         <button className="btn primary block" onClick={save}>保存</button>
+        {me && (
+          <button className="btn block" style={{ marginTop: 24, color: "var(--neg)" }} onClick={clearAll}>
+            新一局（清空记录）
+          </button>
+        )}
       </div>
     </div>
   );
@@ -108,9 +117,9 @@ export function RoomView({ code }: { code: string }) {
   const tot = useMemo(() => (room ? totals(room) : {}), [room]);
   const plan = useMemo(() => settle(tot), [tot]);
 
-  async function join() {
+  async function join(n = joinName) {
     try {
-      const { player } = await api<{ player: Me }>(`/api/rooms/${code}/join`, { method: "POST", body: { name: joinName } });
+      const { player } = await api<{ player: Me }>(`/api/rooms/${code}/join`, { method: "POST", body: { name: n } });
       saveMe(code, player, room?.name);
       setMe(player);
       refresh();
@@ -129,9 +138,9 @@ export function RoomView({ code }: { code: string }) {
   }
 
   async function share() {
-    const url = `${location.origin}/room/${code}`;
+    const url = location.origin;
     try {
-      if (navigator.share) await navigator.share({ title: `川麻记分 · 房间 ${code}`, url });
+      if (navigator.share) await navigator.share({ title: "川麻记分", url });
       else {
         await navigator.clipboard.writeText(url);
         setCopied(true);
@@ -143,7 +152,6 @@ export function RoomView({ code }: { code: string }) {
   if (!room) {
     return (
       <div className="wrap">
-        <Link href="/">← 首页</Link>
         {err ? <div className="err" style={{ marginTop: 16 }}>{err}</div> : <p className="muted">加载中…</p>}
       </div>
     );
@@ -154,33 +162,31 @@ export function RoomView({ code }: { code: string }) {
   return (
     <div className="wrap">
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <Link href="/">← 首页</Link>
+        <h1 style={{ margin: 0 }}>川麻记分</h1>
         <div className="row">
           <Link className="btn small" href="/calc">算番器</Link>
           <button className="btn small" onClick={() => setSettings(true)}>规则</button>
           <button className="btn small" onClick={share}>{copied ? "已复制" : "邀请"}</button>
         </div>
       </div>
-      <h1>{room.name}</h1>
-      <div className="muted">
-        房间号 <span className="code">{room.code}</span> · 底分 {room.settings.base} · {room.settings.cap} 番封顶 ·{" "}
+      <div className="muted" style={{ marginTop: 4 }}>
+        底分 {room.settings.base} · {room.settings.cap} 番封顶 ·{" "}
         {room.settings.zimo === "addBase" ? "自摸加底" : "自摸加番"} · 共 {room.hands.length} 把
       </div>
       {err && <div className="err">{err}</div>}
 
       {ready && !meValid && (
         <div className="card">
-          <b>加入这个房间</b>
-          <p className="muted" style={{ margin: "4px 0 8px" }}>输入名字加入。用同一个名字可以在别的手机上接着记。</p>
+          <b>你是谁</b>
+          <p className="muted" style={{ margin: "4px 0 8px" }}>输入名字加入，或点已有的名字。</p>
           <div className="row">
             <input type="text" className="grow" style={{ width: "auto", flex: 1 }} value={joinName} maxLength={16} placeholder="你的名字" onChange={(e) => setJoinName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && join()} />
-            <button className="btn primary" onClick={join} disabled={!joinName.trim()}>加入</button>
+            <button className="btn primary" onClick={() => join()} disabled={!joinName.trim()}>加入</button>
           </div>
           {room.players.length > 0 && (
             <div className="chips" style={{ marginTop: 8 }}>
-              <span className="muted">我是：</span>
               {room.players.map((p) => (
-                <button key={p.id} className="chip" onClick={() => setJoinName(p.name)}>{p.name}</button>
+                <button key={p.id} className="chip" onClick={() => join(p.name)}>{p.name}</button>
               ))}
             </div>
           )}
@@ -204,7 +210,7 @@ export function RoomView({ code }: { code: string }) {
         </div>
       )}
       {room.players.length < 2 && meValid && (
-        <p className="muted">把房间号 <span className="code">{room.code}</span> 或邀请链接发给牌友，至少 2 人才能记账。</p>
+        <p className="muted">把网址发给牌友，至少 2 人才能记账。</p>
       )}
 
       {plan.length > 0 && (
@@ -261,7 +267,7 @@ export function RoomView({ code }: { code: string }) {
       {entry && me && (
         <HandEntry room={room} me={me} onClose={() => setEntry(false)} onSaved={(r) => { setRoom(r); setEntry(false); }} />
       )}
-      {settings && <SettingsSheet room={room} onClose={() => setSettings(false)} onSaved={(r) => { setRoom(r); setSettings(false); }} />}
+      {settings && <SettingsSheet room={room} me={meValid ? me : null} onClose={() => setSettings(false)} onSaved={(r) => { setRoom(r); setSettings(false); }} />}
     </div>
   );
 }

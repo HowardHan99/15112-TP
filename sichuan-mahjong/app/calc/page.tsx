@@ -7,7 +7,7 @@ export const metadata = { title: "算番器 · 川麻记分" };
 export default function Calc() {
   return (
     <div className="wrap">
-      <Link href="/">← 首页</Link>
+      <Link href="/">← 返回</Link>
       <h1>算番器</h1>
       <p className="muted">拍照或手动输入一手牌：14 张看胡没胡、几番；13 张看听什么、每张能胡几番。</p>
       <HandAnalyzer />
