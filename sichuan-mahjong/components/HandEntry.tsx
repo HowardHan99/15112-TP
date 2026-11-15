@@ -107,6 +107,68 @@ function FanEditor({ spec, onChange, room }: { spec: FanSpec; onChange: (s: FanS
   );
 }
 
+const GANG_NAME = { an: "暗杠", ba: "巴杠", zhi: "直杠" } as const;
+
+/** 杠：每人一行，点一下记一个 */
+function GangPanel({
+  players, events, setEvents, base,
+}: { players: Player[]; events: HandEvent[]; setEvents: (f: (es: HandEvent[]) => HandEvent[]) => void; base: number }) {
+  const [picking, setPicking] = useState<string | null>(null); // 正在选“谁点的杠”的人
+  const gangs = events.map((e, i) => [e, i] as const).filter((x): x is readonly [Gang, number] => x[0].kind === "gang");
+  const count = (who: string, t: Gang["gangType"]) => gangs.filter(([g]) => g.who === who && g.gangType === t).length;
+  const others = (w: string) => players.map((p) => p.id).filter((id) => id !== w);
+  const addGang = (who: string, gangType: Gang["gangType"], from: string | null = null) =>
+    setEvents((es) => [...es, { kind: "gang", gangType, who, from, payers: gangType === "zhi" ? [] : others(who) }]);
+  const removeLast = (who: string, t: Gang["gangType"]) => {
+    const last = [...gangs].reverse().find(([g]) => g.who === who && g.gangType === t);
+    if (last) setEvents((es) => es.filter((_, j) => j !== last[1]));
+  };
+  const nm = (id: string | null) => players.find((p) => p.id === id)?.name ?? "?";
+
+  return (
+    <div className="card">
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <b>杠</b>
+        <span className="muted">暗杠每家 {2 * base} · 巴杠每家 {base} · 直杠点杠者付 {2 * base}</span>
+      </div>
+      {players.map((p) => (
+        <div key={p.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
+          <div className="row">
+            <span className="grow">{p.name}</span>
+            {(["an", "ba", "zhi"] as const).map((t) => {
+              const n = count(p.id, t);
+              return (
+                <span key={t} className="gang-btn">
+                  <button
+                    className={`chip${n ? " on" : ""}`}
+                    onClick={() => (t === "zhi" ? setPicking(picking === p.id ? null : p.id) : addGang(p.id, t))}
+                  >
+                    {GANG_NAME[t]}{n ? ` ×${n}` : ""}
+                  </button>
+                  {n > 0 && <button className="chip minus" onClick={() => removeLast(p.id, t)} aria-label="减一个">−</button>}
+                </span>
+              );
+            })}
+          </div>
+          {picking === p.id && (
+            <div className="chips" style={{ marginTop: 6 }}>
+              <span className="muted">谁点的杠：</span>
+              {players.filter((o) => o.id !== p.id).map((o) => (
+                <button key={o.id} className="chip" onClick={() => { addGang(p.id, "zhi", o.id); setPicking(null); }}>{o.name}</button>
+              ))}
+            </div>
+          )}
+          {gangs.some(([g]) => g.who === p.id && g.gangType === "zhi") && (
+            <div className="muted" style={{ marginTop: 2 }}>
+              直杠：{gangs.filter(([g]) => g.who === p.id && g.gangType === "zhi").map(([g]) => `${nm(g.from)}点`).join("、")}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; onClose: () => void; onSaved: (r: Room) => void }) {
   const players = room.players;
   const s = room.settings;
@@ -172,11 +234,12 @@ export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; 
         </p>
 
         {events.map((e, i) => {
+          if (e.kind === "gang") return null;
           const done = huedBefore(i);
           return (
             <div key={i} className={`card evt ${e.kind}`}>
               <div className="row" style={{ justifyContent: "space-between" }}>
-                <b>{e.kind === "hu" ? "胡牌" : e.kind === "gang" ? "杠" : "查叫 / 其他"}</b>
+                <b>{e.kind === "hu" ? "胡牌" : "查叫 / 其他"}</b>
                 <button className="btn small danger" onClick={() => setEvents((es) => es.filter((_, j) => j !== i))}>删除</button>
               </div>
 
@@ -214,40 +277,6 @@ export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; 
                 );
               })()}
 
-              {e.kind === "gang" && (() => {
-                const g = e as Gang;
-                return (
-                  <>
-                    <h3>谁杠</h3>
-                    <PlayerChips
-                      players={players}
-                      value={g.who}
-                      onChange={(w) => update(i, { ...g, who: w, from: g.from === w ? null : g.from, payers: players.map((p) => p.id).filter((id) => id !== w && !done.includes(id)) })}
-                    />
-                    <h3>杠的类型</h3>
-                    <div className="chips">
-                      {([["zhi", "直杠（点杠）", "点杠的人付 2 底"], ["ba", "巴杠（刮风）", "每家 1 底"], ["an", "暗杠（下雨）", "每家 2 底"]] as const).map(([k, n, d]) => (
-                        <button key={k} className={`chip${g.gangType === k ? " on" : ""}`} onClick={() => update(i, { ...g, gangType: k })}>
-                          {n}<small>{d}</small>
-                        </button>
-                      ))}
-                    </div>
-                    {g.gangType === "zhi" ? (
-                      <>
-                        <h3>谁点的杠</h3>
-                        <PlayerChips players={players} value={g.from} onChange={(f) => update(i, { ...g, from: f })} exclude={[g.who]} red />
-                      </>
-                    ) : (
-                      <>
-                        <h3>谁付钱</h3>
-                        <MultiPlayerChips players={players} value={g.payers} onChange={(v) => update(i, { ...g, payers: v })} exclude={[g.who]} />
-                      </>
-                    )}
-                    <div className="muted" style={{ marginTop: 8 }}>每家付 {fmt(gangPerPayer(g, s))}</div>
-                  </>
-                );
-              })()}
-
               {e.kind === "adjust" && (() => {
                 const a = e as Adj;
                 return (
@@ -279,9 +308,10 @@ export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; 
           );
         })}
 
+        <GangPanel players={players} events={events} setEvents={setEvents} base={s.base} />
+
         <div className="row" style={{ margin: "12px 0" }}>
           <button className="btn small" onClick={() => add("hu")}>+ 又有人胡</button>
-          <button className="btn small" onClick={() => add("gang")}>+ 杠</button>
           <button className="btn small" onClick={() => add("adjust")}>+ 查叫/花猪</button>
         </div>
         {events.length > 0 && (
