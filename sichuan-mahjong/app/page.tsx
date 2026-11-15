@@ -19,7 +19,7 @@ export default function Home() {
 
   useEffect(() => {
     setRecent(loadRecent());
-    try { setMyName(localStorage.getItem("mj:name") || ""); } catch {}
+    try { const n = localStorage.getItem("mj:name"); if (n) setMyName((cur) => cur || n); } catch {}
   }, []);
 
   async function create() {
@@ -38,7 +38,7 @@ export default function Home() {
 
   return (
     <div className="wrap">
-      <h1>🀄 川麻记分</h1>
+      <h1>川麻记分</h1>
       <p className="muted" style={{ marginTop: 0 }}>血战到底 · 算番 · 记筹码 · 多人房间实时同步 · 拍照识牌</p>
 
       <div className="card">
@@ -67,7 +67,7 @@ export default function Home() {
       </div>
 
       <Link href="/calc" className="card" style={{ display: "block", textDecoration: "none", color: "inherit" }}>
-        <b>📷 算番器 →</b>
+        <b>算番器 ›</b>
         <div className="muted">拍一张牌的照片，看胡没胡、有几番、听什么牌</div>
       </Link>
 

@@ -254,7 +254,7 @@ export function RoomView({ code }: { code: string }) {
       {meValid && room.players.length >= 2 && (
         <div className="fab">
           <div className="inner">
-            <button className="btn primary block big" onClick={() => setEntry(true)}>＋ 记一把</button>
+            <button className="btn primary block big" onClick={() => setEntry(true)}>记一把</button>
           </div>
         </div>
       )}

@@ -104,7 +104,7 @@ export function HandAnalyzer({
     <div>
       <div className="row">
         <button className="btn primary grow" disabled={busy} onClick={() => camRef.current?.click()}>
-          {busy ? <><span className="spin" /> 识别中…</> : "📷 拍照识牌"}
+          {busy ? <><span className="spin" /> 识别中…</> : "拍照识牌"}
         </button>
         <button className="btn" disabled={busy} onClick={() => albumRef.current?.click()}>
           从相册选

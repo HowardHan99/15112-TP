@@ -51,7 +51,7 @@ function FanEditor({ spec, onChange, room }: { spec: FanSpec; onChange: (s: FanS
   return (
     <div>
       <button className="btn block" style={{ marginBottom: 8 }} onClick={() => setScan(true)}>
-        📷 拍照 / 选牌 自动算番
+        拍照或选牌，自动算番
       </button>
       <h3>牌型</h3>
       <div className="chips">
@@ -165,7 +165,7 @@ export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; 
           return (
             <div key={i} className={`card evt ${e.kind}`}>
               <div className="row" style={{ justifyContent: "space-between" }}>
-                <b>{e.kind === "hu" ? "🀄 胡牌" : e.kind === "gang" ? "🀫 杠（刮风下雨）" : "💰 查叫 / 花猪 / 其他"}</b>
+                <b>{e.kind === "hu" ? "胡牌" : e.kind === "gang" ? "杠" : "查叫 / 其他"}</b>
                 <button className="btn small danger" onClick={() => setEvents((es) => es.filter((_, j) => j !== i))}>删除</button>
               </div>
 
