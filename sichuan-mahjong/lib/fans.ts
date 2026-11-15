@@ -110,3 +110,36 @@ export function comboName(spec: FanSpec): string {
 export function emptySpec(): FanSpec {
   return { pattern: "pinghu", qing: false, gen: 0, extras: [] };
 }
+
+/** 常见牌型（直接点选），番数不含加番 */
+export const COMBOS: { name: string; pattern: PatternKey; qing: boolean; gen: number }[] = [
+  { name: "平胡", pattern: "pinghu", qing: false, gen: 0 },
+  { name: "对对胡", pattern: "duidui", qing: false, gen: 0 },
+  { name: "清一色", pattern: "pinghu", qing: true, gen: 0 },
+  { name: "七对", pattern: "qidui", qing: false, gen: 0 },
+  { name: "带幺九", pattern: "daiyao", qing: false, gen: 0 },
+  { name: "金钩钓", pattern: "jingou", qing: false, gen: 0 },
+  { name: "清对", pattern: "duidui", qing: true, gen: 0 },
+  { name: "龙七对", pattern: "qidui", qing: false, gen: 1 },
+  { name: "将对", pattern: "jiangdui", qing: false, gen: 0 },
+  { name: "清七对", pattern: "qidui", qing: true, gen: 0 },
+  { name: "清金钩钓", pattern: "jingou", qing: true, gen: 0 },
+  { name: "清带幺", pattern: "daiyao", qing: true, gen: 0 },
+  { name: "将金钩钓", pattern: "jiangjingou", qing: false, gen: 0 },
+  { name: "清龙七对", pattern: "qidui", qing: true, gen: 1 },
+  { name: "十八罗汉", pattern: "jingou", qing: false, gen: 4 },
+  { name: "清十八罗汉", pattern: "jingou", qing: true, gen: 4 },
+];
+
+export function comboFan(c: (typeof COMBOS)[number]): number {
+  return totalFan({ pattern: c.pattern, qing: c.qing, gen: c.gen, extras: [] });
+}
+
+
+/** 牌型名 + 多出来的根，如“清对 带1根” */
+export function fullName(spec: FanSpec): string {
+  const n = comboName(spec);
+  const base = n.includes("十八罗汉") ? 4 : n.includes("龙七对") ? 1 : 0;
+  const extra = spec.gen - base;
+  return extra > 0 ? `${n} 带${extra}根` : n;
+}

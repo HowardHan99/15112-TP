@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { EXTRAS, PATTERNS, comboName, emptySpec, totalFan, type ExtraKey, type FanSpec } from "@/lib/fans";
+import { COMBOS, EXTRAS, comboFan, comboName, fullName, emptySpec, totalFan, type ExtraKey, type FanSpec } from "@/lib/fans";
 import { eventDeltas, gangPerPayer, huFan, huPerPayer, validateEvent, type HandEvent, type Player, type Room } from "@/lib/scoring";
 import { HandAnalyzer } from "./HandAnalyzer";
 import { api, type Me } from "./api";
@@ -48,26 +48,29 @@ function FanEditor({ spec, onChange, room }: { spec: FanSpec; onChange: (s: FanS
   const [scan, setScan] = useState(false);
   const toggle = (k: ExtraKey) =>
     onChange({ ...spec, extras: spec.extras.includes(k) ? spec.extras.filter((x) => x !== k) : [...spec.extras, k] });
+  const current = comboName(spec);
+  // 选了龙七对/十八罗汉，根至少 1/4；其余牌型根从 0 开始，用下面的 ± 加
+  const baseGen = COMBOS.find((c) => c.name === current)?.gen ?? 0;
+  const extraGen = Math.max(0, spec.gen - baseGen);
   return (
     <div>
-      <button className="btn block" style={{ marginBottom: 8 }} onClick={() => setScan(true)}>
-        选牌自动算番
-      </button>
       <h3>牌型</h3>
-      <div className="chips">
-        {PATTERNS.map((p) => (
-          <button key={p.key} className={`chip${spec.pattern === p.key ? " on" : ""}`} title={p.desc} onClick={() => onChange({ ...spec, pattern: p.key })}>
-            {p.name}<small>{p.fan}番</small>
+      <div className="combo-grid">
+        {COMBOS.map((c) => (
+          <button
+            key={c.name}
+            className={`chip${current === c.name ? " on" : ""}`}
+            onClick={() => onChange({ ...spec, pattern: c.pattern, qing: c.qing, gen: c.gen + extraGen })}
+          >
+            {c.name}<small>{comboFan(c)}番</small>
           </button>
         ))}
       </div>
-      <div className="row" style={{ marginTop: 10 }}>
-        <button className={`chip${spec.qing ? " on" : ""}`} onClick={() => onChange({ ...spec, qing: !spec.qing })}>
-          清一色<small>+2</small>
-        </button>
-        <span className="muted" style={{ marginLeft: 8 }}>根（4 张一样）</span>
-        <button className="btn small" onClick={() => onChange({ ...spec, gen: Math.max(0, spec.gen - 1) })}>−</button>
-        <b style={{ minWidth: 18, textAlign: "center" }}>{spec.gen}</b>
+      <div className="row" style={{ marginTop: 12 }}>
+        <span>根（杠或 4 张一样）</span>
+        <span className="grow" />
+        <button className="btn small" onClick={() => onChange({ ...spec, gen: Math.max(baseGen, spec.gen - 1) })}>−</button>
+        <b style={{ minWidth: 20, textAlign: "center" }}>{extraGen}</b>
         <button className="btn small" onClick={() => onChange({ ...spec, gen: Math.min(4, spec.gen + 1) })}>＋</button>
       </div>
       <h3>加番</h3>
@@ -78,11 +81,14 @@ function FanEditor({ spec, onChange, room }: { spec: FanSpec; onChange: (s: FanS
           </button>
         ))}
       </div>
+      <button className="btn small" style={{ marginTop: 12, border: "none", padding: 0, color: "var(--muted)", textDecoration: "underline" }} onClick={() => setScan(true)}>
+        不确定几番？点牌自动算
+      </button>
       {scan && (
         <div className="sheet-bg" onClick={() => setScan(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-head">
-              <h2>算番</h2>
+              <h2>点牌算番</h2>
               <button className="btn small" onClick={() => setScan(false)}>关闭</button>
             </div>
             <HandAnalyzer
@@ -104,7 +110,10 @@ function FanEditor({ spec, onChange, room }: { spec: FanSpec; onChange: (s: FanS
 export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; onClose: () => void; onSaved: (r: Room) => void }) {
   const players = room.players;
   const s = room.settings;
-  const [events, setEvents] = useState<HandEvent[]>([]);
+  const [events, setEvents] = useState<HandEvent[]>(() => {
+    const w = players.some((p) => p.id === me.id) ? me.id : players[0].id;
+    return [{ kind: "hu", winner: w, from: null, payers: players.map((p) => p.id).filter((id) => id !== w), spec: emptySpec() }];
+  });
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -159,7 +168,7 @@ export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; 
           <button className="btn small" onClick={onClose}>取消</button>
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          底分 {s.base}，{s.cap} 番封顶，{s.zimo === "addBase" ? "自摸加底" : "自摸加番"}。一把里按顺序添加：胡牌、刮风下雨、查叫等。
+          底分 {s.base}，{s.cap} 番封顶，{s.zimo === "addBase" ? "自摸加底" : "自摸加番"}。
         </p>
 
         {events.map((e, i) => {
@@ -196,7 +205,7 @@ export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; 
                     )}
                     <FanEditor spec={h.spec} room={room} onChange={(sp) => update(i, { ...h, spec: sp })} />
                     <div className="ok" style={{ marginTop: 12 }}>
-                      <b>{comboName(h.spec)}</b> · {totalFan(h.spec)} 番
+                      <b>{fullName(h.spec)}</b> · {totalFan(h.spec)} 番
                       {h.from === null && s.zimo === "addFan" ? " +1(自摸)" : ""}
                       {huFan(h, s) > s.cap ? `（封顶 ${s.cap} 番）` : ""} → 每家付 <b>{fmt(huPerPayer(h, s))}</b>
                       {h.from === null && s.zimo === "addBase" ? "（含自摸加底）" : ""}
@@ -270,13 +279,11 @@ export function HandEntry({ room, me, onClose, onSaved }: { room: Room; me: Me; 
           );
         })}
 
-        <div className="row" style={{ margin: "10px 0" }}>
-          <button className="btn grow" onClick={() => add("hu")}>+ 胡牌</button>
-          <button className="btn grow" onClick={() => add("gang")}>+ 杠</button>
-          <button className="btn grow" onClick={() => add("adjust")}>+ 查叫/其他</button>
+        <div className="row" style={{ margin: "12px 0" }}>
+          <button className="btn small" onClick={() => add("hu")}>+ 又有人胡</button>
+          <button className="btn small" onClick={() => add("gang")}>+ 杠</button>
+          <button className="btn small" onClick={() => add("adjust")}>+ 查叫/花猪</button>
         </div>
-        {events.length === 0 && <p className="muted">先点「+ 胡牌」。血战到底一把可以有多人胡，依次添加即可；流局可以只记杠和查叫。</p>}
-
         {events.length > 0 && (
           <div className="card">
             <b>这把结果</b>
@@ -311,7 +318,7 @@ export function describeEvent(e: HandEvent, room: Room, settings = room.settings
   if (e.kind === "hu") {
     const how = e.from ? `${n(e.from)} 点炮` : "自摸";
     const fan = huFan(e, settings);
-    return `${n(e.winner)} ${how} · ${comboName(e.spec)} ${fan} 番${fan > settings.cap ? "(封顶)" : ""}`;
+    return `${n(e.winner)} ${how} · ${fullName(e.spec)} ${fan} 番${fan > settings.cap ? "(封顶)" : ""}`;
   }
   if (e.kind === "gang") {
     const t = e.gangType === "zhi" ? `直杠（${n(e.from)} 点）` : e.gangType === "ba" ? "巴杠" : "暗杠";
